@@ -24,7 +24,7 @@ use casper_types::{
 };
 
 const CONTRACT_NAME_KEY: &str = "contract_name";
-const CONTRACT_NAME: &str = "bithotel_marketplace_v1.0";
+const CONTRACT_NAME: &str = "contract_name";
 
 // Creating constants for the various contract entry points.
 const ENTRY_POINT_INIT: &str = "init";
@@ -65,11 +65,12 @@ pub extern "C" fn init() {
         runtime::revert(MarketplaceError::ContractAlreadyInitialized);
     }
 
+    let contract_name: String = runtime::get_named_arg(CONTRACT_NAME);
     let fee_wallet_hash = runtime::get_named_arg::<Key>(FEE_WALLET_ARG);
     runtime::put_key(FEE_WALLET, fee_wallet_hash);
     runtime::put_key(
         CONTRACT_NAME_KEY,
-        storage::new_uref(CONTRACT_NAME.to_string()).into(),
+        storage::new_uref(contract_name).into(),
     );
     Dict::init(LISTINGS_DICT);
     Dict::init(WHITELIST_DICT);
@@ -317,12 +318,13 @@ pub extern "C" fn un_pause() {
 //This is the full `call` function as defined within the donation contract.
 #[no_mangle]
 pub extern "C" fn call() {
-    // let contract_name: String = runtime::get_named_arg(CONTRACT_NAME_ARG);
+    let contract_name: String = runtime::get_named_arg(CONTRACT_NAME);
     let fee_wallet: Key = runtime::get_named_arg(FEE_WALLET_ARG);
+
     // This establishes the `init` entry point for initializing the contract's infrastructure.
     let init_entry_point = EntryPoint::new(
         ENTRY_POINT_INIT,
-        vec![Parameter::new(FEE_WALLET_ARG, CLType::Key)],
+        vec![Parameter::new(FEE_WALLET_ARG, CLType::Key),Parameter::new(CONTRACT_NAME, CLType::String)],
         CLType::Unit,
         EntryPointAccess::Public,
         EntryPointType::Contract,
@@ -424,14 +426,22 @@ pub extern "C" fn call() {
 
     named_keys.insert(String::from(LISTING_COUNTER), listing_count_start.into());
 
+    let str1 = contract_name.to_string();
+    let str2 = String::from("marketplace_package_hash_");
+    let str3 = String::from("marketplace_access_uref_");
+    let str4 = String::from("marketplace_contract_hash_");
+    let hash_name = str2 + &str1;
+    let uref_name = str3 + &str1;
+    let contract_hash_text = str4 + &str1;
+
     let (contract_hash, _contract_version) = storage::new_contract(
         entry_points,
         Some(named_keys),
-        Some("marketplace_package_hash".to_string()),
-        Some("marketplace_access_uref".to_string()),
-    );
-
-    runtime::put_key("marketplace_contract_hash", contract_hash.into());
+        Some(hash_name.to_string()),
+        Some(uref_name.to_string()),
+   );
+   
+   runtime::put_key(&contract_hash_text.to_string(), contract_hash.into());
     // Call the init entry point to setup and create the fundraising purse
     // and the ledger to track donations made.
     runtime::call_contract::<()>(
@@ -439,6 +449,7 @@ pub extern "C" fn call() {
         ENTRY_POINT_INIT,
         runtime_args! {
             FEE_WALLET_ARG => fee_wallet,
+            CONTRACT_NAME => contract_name,
         },
     )
 }
